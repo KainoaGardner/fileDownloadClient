@@ -71,6 +71,45 @@ void listFiles(FILE *s) {
   printf("\n");
 }
 
+void downloadFile(FILE *s, char *fileName) {
+  fprintf(s, "SIZE %s\n", fileName);
+  char response[100];
+
+  fgets(response, 100, s);
+  char *fSize = strtok(response, " ");
+  int fileSize = atoi(strtok(NULL, " "));
+
+  FILE *outputFile = fopen(fileName, "w");
+  if (!outputFile) {
+    return;
+  }
+
+  fprintf(s, "GET %s\n", fileName);
+  fgets(response, 100, s);
+
+  int bufferSize = 1000;
+  char line[bufferSize];
+  int transferred = 0;
+
+  while (transferred < fileSize) {
+    int remain = fileSize - transferred;
+    int bytes_wanted;
+    if (remain < bufferSize) {
+      bytes_wanted = remain;
+    } else {
+      bytes_wanted = bufferSize;
+    }
+
+    int bytes_received = fread(line, 1, bytes_wanted, s);
+    fwrite(line, 1, bytes_received, outputFile);
+    transferred = transferred + bytes_received;
+  }
+
+  printf("Downloaded %s\n", fileName);
+
+  fclose(outputFile);
+}
+
 int main(int argc, char *argv[]) {
   char host[100];
 
@@ -116,6 +155,10 @@ int main(int argc, char *argv[]) {
       listFiles(s);
       break;
     case 1:
+      char fileName[100];
+      printf("Enter File Name to Download: ");
+      scanf("%s", fileName);
+      downloadFile(s, fileName);
       break;
     case 2:
       break;
