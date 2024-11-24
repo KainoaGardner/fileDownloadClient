@@ -1,4 +1,5 @@
 #include "ansi-colors.h"
+#include <ctype.h>
 #include <libsocket/libinetsocket.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -79,13 +80,17 @@ void downloadFile(FILE *s, char *fileName) {
   char *fSize = strtok(response, " ");
   int fileSize = atoi(strtok(NULL, " "));
 
+  fprintf(s, "GET %s\n", fileName);
+  fgets(response, 100, s);
+  if (strstr(response, "-ERR")) {
+    printf("Invalid Filename %s\n", fileName);
+    return;
+  }
+
   FILE *outputFile = fopen(fileName, "w");
   if (!outputFile) {
     return;
   }
-
-  fprintf(s, "GET %s\n", fileName);
-  fgets(response, 100, s);
 
   int bufferSize = 1000;
   char line[bufferSize];
@@ -108,6 +113,47 @@ void downloadFile(FILE *s, char *fileName) {
   printf("Downloaded %s\n", fileName);
 
   fclose(outputFile);
+}
+
+void downloadSingleFile(FILE *s) {
+  char fileName[100];
+  printf("Enter File Name to Download: ");
+  scanf("%s", fileName);
+
+  FILE *checkFile = fopen(fileName, "r");
+  if (checkFile) {
+    char overwrite[10];
+    printf("Do you want to ovewrite %s (Y/N)?: ", fileName);
+    scanf("%s", overwrite);
+
+    fclose(checkFile);
+    if (strcmp(overwrite, "Y") != 0) {
+      return;
+    }
+  }
+
+  downloadFile(s, fileName);
+}
+
+void downloadAllFiles(FILE *s) {
+  fprintf(s, "LIST\n");
+  char line[1000];
+
+  // flush OK
+  fgets(line, 100, s);
+
+  while (fgets(line, 100, s) != NULL) {
+    char *nl = strchr(line, '\n');
+    if (nl)
+      *nl = '\0';
+
+    if (strcmp(line, ".") == 0) {
+      break;
+    }
+
+    char *fileSize = strtok(line, " ");
+    char *fileName = strtok(NULL, " ");
+  }
 }
 
 int main(int argc, char *argv[]) {
@@ -155,12 +201,10 @@ int main(int argc, char *argv[]) {
       listFiles(s);
       break;
     case 1:
-      char fileName[100];
-      printf("Enter File Name to Download: ");
-      scanf("%s", fileName);
-      downloadFile(s, fileName);
+      downloadSingleFile(s);
       break;
     case 2:
+      downloadAllFiles(s);
       break;
     case 3:
       printf("Quitting\n");
