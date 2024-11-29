@@ -1,5 +1,4 @@
 #include "ansi-colors.h"
-#include <ctype.h>
 #include <libsocket/libinetsocket.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -17,6 +16,7 @@ void printFileSize(double bytes) {
   }
 }
 
+// choose color for each file type
 void printListColor(char *fileName) {
   if (strstr(fileName, "txt") != NULL) {
     printf("%s", WHT);
@@ -32,12 +32,14 @@ void printListColor(char *fileName) {
 }
 
 void printTime(double time, int fileSize) {
+  // print total time
   if (time > 1000) {
     printf("Total time %0.2fs\n", time / 1000);
   } else {
     printf("Total time %0.2fms\n", time);
   }
 
+  // print size per secound
   if (fileSize > 1000000) {
     printf("Download Speed %*.2fMB/s\n", 8,
            (fileSize / 1000000.0) / (time / 1000));
@@ -48,18 +50,20 @@ void printTime(double time, int fileSize) {
 }
 
 void listFiles(FILE *s) {
-  /* fprintf(s, "LIST\n"); */
+  // call list
   fprintf(s, "LIST\n");
   char line[1000];
 
   // flush OK
   fgets(line, 100, s);
 
+  // format print
   printf("%-20s", "Filename");
   printf("%*s\n", 11, "Size");
   printf("-------------------------------\n");
 
   while (fgets(line, 100, s) != NULL) {
+    // remove newline
     char *nl = strchr(line, '\n');
     if (nl)
       *nl = '\0';
@@ -68,6 +72,7 @@ void listFiles(FILE *s) {
       break;
     }
 
+    // split string
     char *fileSize = strtok(line, " ");
     char *fileName = strtok(NULL, " ");
 
@@ -75,37 +80,37 @@ void listFiles(FILE *s) {
     printf("%-20s", fileName);
     printFileSize((double)(atoi(fileSize)));
     printf("%s", CRESET);
-
-    /* printf("%s\n", fileSize); */
-
-    /* printf("%s\n", line); */
-
-    // get array of password variations
   }
 
   printf("\n");
 }
 
 void downloadFile(FILE *s, char *fileName) {
-
+  // get start time
   struct timeval now;
   gettimeofday(&now, NULL);
   double sentTime = now.tv_sec + now.tv_usec / 1000000.0;
 
+  // call size
   fprintf(s, "SIZE %s\n", fileName);
   char response[100];
-
   fgets(response, 100, s);
+
+  // split response string to get size
   char *fSize = strtok(response, " ");
   int fileSize = atoi(strtok(NULL, " "));
 
+  // call get
   fprintf(s, "GET %s\n", fileName);
   fgets(response, 100, s);
+
+  // return if err
   if (strstr(response, "-ERR")) {
     printf("Invalid Filename %s\n", fileName);
     return;
   }
 
+  // create outputFile
   FILE *outputFile = fopen(fileName, "w");
   if (!outputFile) {
     return;
@@ -118,8 +123,12 @@ void downloadFile(FILE *s, char *fileName) {
   int count = 0;
 
   printf("Downloading: [");
+
+  // transferred 1000 bytes at a time
   while (transferred < fileSize) {
+    // needed to print progress bar
     printf("‎");
+
     int remain = fileSize - transferred;
     int bytes_wanted;
     if (remain < bufferSize) {
@@ -130,18 +139,26 @@ void downloadFile(FILE *s, char *fileName) {
 
     int bytes_received = fread(line, 1, bytes_wanted, s);
 
+    // progress bar every 10% of filesize
     transferredCount += bytes_received;
     if (transferredCount / fileSize >= 0.10) {
-      printf("⬛");
+      while (transferredCount / fileSize >= 0.10) {
+        printf("⬛");
+        transferredCount -= fileSize * 0.1;
+      }
       transferredCount = 0;
     }
 
+    // write to outputfile
     fwrite(line, 1, bytes_received, outputFile);
+
     transferred = transferred + bytes_received;
   }
 
   printf("]\n");
   printf("Downloaded %s\n", fileName);
+
+  // get end time
   gettimeofday(&now, NULL);
   double receivedTime = now.tv_sec + now.tv_usec / 1000000.0;
   double time = (receivedTime - sentTime) * 1000;
@@ -156,6 +173,7 @@ void downloadSingleFile(FILE *s) {
   printf("Enter File Name to Download: ");
   scanf("%s", fileName);
 
+  // if already have file in directory ask if to replace
   FILE *checkFile = fopen(fileName, "r");
   if (checkFile) {
     char overwrite[10];
@@ -171,33 +189,11 @@ void downloadSingleFile(FILE *s) {
   downloadFile(s, fileName);
 }
 
-void downloadAllFiles(FILE *s) {
-  fprintf(s, "LIST\n");
-  char line[1000];
-
-  // flush OK
-  fgets(line, 100, s);
-
-  while (fgets(line, 100, s) != NULL) {
-    char *nl = strchr(line, '\n');
-    if (nl)
-      *nl = '\0';
-
-    if (strcmp(line, ".") == 0) {
-      break;
-    }
-
-    char *fileSize = strtok(line, " ");
-    char *fileName = strtok(NULL, " ");
-  }
-}
-
 int main(int argc, char *argv[]) {
   char host[100];
 
   int validHost = 0;
   while (validHost == 0) {
-
     printf("Which server (newark/london): ");
     scanf("%s", host);
 
@@ -209,6 +205,8 @@ int main(int argc, char *argv[]) {
   }
 
   strcat(host, ".cs.sierracollege.edu");
+
+  // connect to host
   int fd = create_inet_stream_socket(host, "3456", LIBSOCKET_IPv4, 0);
 
   if (fd < 0) {
@@ -216,10 +214,12 @@ int main(int argc, char *argv[]) {
     exit(1);
   }
 
+  // open server socket
   FILE *s = fdopen(fd, "r+");
   char line[100];
   fgets(line, 100, s);
 
+  // get user option
   int optionInput;
   char flush[10];
   while (optionInput != 2) {
