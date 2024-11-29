@@ -25,11 +25,25 @@ void printListColor(char *fileName) {
   } else if (strstr(fileName, "mp3") != NULL) {
     printf("%s", BLU);
   } else if (strstr(fileName, "exe") != NULL) {
-    printf("%s", YEL);
+    printf("%s", MAG);
+  } else {
+    printf("%s", RED);
+  }
+}
+
+void printTime(double time, int fileSize) {
+  if (time > 1000) {
+    printf("Total time %0.2fs\n", time / 1000);
+  } else {
+    printf("Total time %0.2fms\n", time);
   }
 
-  else {
-    printf("%s", RED);
+  if (fileSize > 1000000) {
+    printf("Download Speed %*.2fMB/s\n", 8,
+           (fileSize / 1000000.0) / (time / 1000));
+  } else {
+    printf("Download Speed %*.2fKB/s\n", 8,
+           (fileSize / 1000.0) / (time / 1000));
   }
 }
 
@@ -73,6 +87,11 @@ void listFiles(FILE *s) {
 }
 
 void downloadFile(FILE *s, char *fileName) {
+
+  struct timeval now;
+  gettimeofday(&now, NULL);
+  double sentTime = now.tv_sec + now.tv_usec / 1000000.0;
+
   fprintf(s, "SIZE %s\n", fileName);
   char response[100];
 
@@ -95,8 +114,12 @@ void downloadFile(FILE *s, char *fileName) {
   int bufferSize = 1000;
   char line[bufferSize];
   int transferred = 0;
+  double transferredCount = 0;
+  int count = 0;
 
+  printf("Downloading: [");
   while (transferred < fileSize) {
+    printf("‎");
     int remain = fileSize - transferred;
     int bytes_wanted;
     if (remain < bufferSize) {
@@ -106,11 +129,24 @@ void downloadFile(FILE *s, char *fileName) {
     }
 
     int bytes_received = fread(line, 1, bytes_wanted, s);
+
+    transferredCount += bytes_received;
+    if (transferredCount / fileSize >= 0.10) {
+      printf("⬛");
+      transferredCount = 0;
+    }
+
     fwrite(line, 1, bytes_received, outputFile);
     transferred = transferred + bytes_received;
   }
 
+  printf("]\n");
   printf("Downloaded %s\n", fileName);
+  gettimeofday(&now, NULL);
+  double receivedTime = now.tv_sec + now.tv_usec / 1000000.0;
+  double time = (receivedTime - sentTime) * 1000;
+  printTime(time, fileSize);
+  printf("\n");
 
   fclose(outputFile);
 }
@@ -185,12 +221,12 @@ int main(int argc, char *argv[]) {
   fgets(line, 100, s);
 
   int optionInput;
-  while (optionInput != 3) {
+  char flush[10];
+  while (optionInput != 2) {
     printf("-----------------------\n");
     printf("0) List Files\n");
     printf("1) Download One File\n");
-    printf("2) Download All Files\n");
-    printf("3) Quit\n");
+    printf("2) Quit\n");
     printf("What would you like to do: ");
     scanf("%d", &optionInput);
     printf("-----------------------\n");
@@ -204,13 +240,11 @@ int main(int argc, char *argv[]) {
       downloadSingleFile(s);
       break;
     case 2:
-      downloadAllFiles(s);
-      break;
-    case 3:
       printf("Quitting\n");
       break;
     default:
-      printf("Invalid Option %d", optionInput);
+      printf("Invalid Option\n");
+      scanf("%s", flush);
     }
   }
 
